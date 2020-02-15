@@ -1,0 +1,11 @@
+# Eureka config for discovery
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://admin:admin@jhipster-registry:8761/eureka/
+  instance:
+    preferIpAddress: true
+    metadataMap:
+      group: example-admin-group
+      version: 1.0

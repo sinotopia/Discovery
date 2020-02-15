@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.2.1.RELEASE</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.nepxion</groupId>
+    <artifactId>discovery-springcloud-example</artifactId>
+    <name>Nepxion Discovery Spring Cloud Example</name>
+    <packaging>pom</packaging>
+    <version>${revision}</version>
+    <description>Nepxion Discovery is an enhancement for Spring Cloud Discovery</description>
+    <url>http://www.nepxion.com</url>
+
+    <properties>
+        <discovery.version>6.0.0-RC1</discovery.version>
+        <spring.cloud.version>Hoxton.RELEASE</spring.cloud.version>
+        <spring.cloud.alibaba.version>2.1.1.RELEASE</spring.cloud.alibaba.version>
+        <spring.boot.version>2.2.1.RELEASE</spring.boot.version>
+        <spring.boot.admin.version>2.2.0</spring.boot.admin.version>
+        <java.version>1.8</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <revision>1.0.0</revision>
+        <lombok.version>1.18.8</lombok.version>
+        <!-- These remain empty unless the corresponding profile is active -->
+        <profile.discovery/>
+        <profile.config-center/>
+        <start-class/>
+        <maven-resources-plugin.version>3.1.0</maven-resources-plugin.version>
+    </properties>
+
+    <modules>
+        <module>discovery-springcloud-example-admin</module>
+        <module>discovery-springcloud-example-console</module>
+        <module>discovery-springcloud-example-eureka</module>
+        <module>discovery-springcloud-example-service</module>
+        <module>discovery-springcloud-example-zuul</module>
+        <module>discovery-springcloud-example-gateway</module>
+    </modules>
+
+    <profiles>
+        <profile>
+            <id>nacos</id>
+            <properties>
+                <profile.discovery>,nacos</profile.discovery>
+                <profile.config-center>,nacos</profile.config-center>
+            </properties>
+        </profile>
+        <profile>
+            <id>eureka</id>
+            <properties>
+                <profile.discovery>,eureka</profile.discovery>
+            </properties>
+        </profile>
+        <profile>
+            <id>consul</id>
+            <properties>
+                <profile.discovery>,consul</profile.discovery>
+            </properties>
+        </profile>
+        <profile>
+            <id>zookeeper</id>
+            <properties>
+                <profile.discovery>,zookeeper</profile.discovery>
+            </properties>
+        </profile>
+        <profile>
+            <id>apollo</id>
+            <properties>
+                <profile.config-center>,apollo</profile.config-center>
+            </properties>
+        </profile>
+        <profile>
+            <id>redis</id>
+            <properties>
+                <profile.config-center>,redis</profile.config-center>
+            </properties>
+        </profile>
+    </profiles>
+
+    <dependencyManagement>
+
+    </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <compilerArgs>
+                        <arg>-parameters</arg>
+                    </compilerArgs>
+                    <encoding>${project.build.sourceEncoding}</encoding>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <configuration>
+                    <updatePomFile>true</updatePomFile>
+                    <flattenMode>oss</flattenMode>
+                    <embedBuildProfileDependencies>true</embedBuildProfileDependencies>
+                    <pomElements>
+                        <distributionManagement>remove</distributionManagement>
+                        <repositories>remove</repositories>
+                    </pomElements>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>flatten-clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>${maven-resources-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>default-resources</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/classes</outputDirectory>
+                            <useDefaultDelimiters>false</useDefaultDelimiters>
+                            <delimiters>
+                                <delimiter>#</delimiter>
+                            </delimiters>
+                            <resources>
+                                <resource>
+                                    <directory>src/main/resources/</directory>
+                                    <filtering>true</filtering>
+                                    <includes>
+                                        <include>config/*.yml</include>
+                                    </includes>
+                                </resource>
+                                <resource>
+                                    <directory>src/main/resources/</directory>
+                                    <filtering>false</filtering>
+                                    <excludes>
+                                        <exclude>config/*.yml</exclude>
+                                    </excludes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <mainClass>${start-class}</mainClass>
+                    <executable>true</executable>
+                    <!-- -->
+                    <fork>false</fork>
+                    <!--
+                    Enable the line below to have remote debugging of your application on port 5005
+                    <jvmArguments>-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005</jvmArguments>
+                    -->
+                </configuration>
+            </plugin>
+        </plugins>
+
+    </build>
+</project>

@@ -1,0 +1,10 @@
+# Consul config for discovery
+
+spring:
+  cloud:
+    consul:
+      discovery:
+        tags: group=example-admin-group,version=1.0
+      host: localhost
+      port: 8500
+      preferIpAddress: true

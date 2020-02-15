@@ -53,12 +53,8 @@
         <module>discovery-console-starter-nacos</module>
         <module>discovery-console-starter-redis</module>
         <module>discovery-console-desktop</module>
-        <module>discovery-springcloud-example-admin</module>
-        <module>discovery-springcloud-example-console</module>
-        <module>discovery-springcloud-example-eureka</module>
-        <module>discovery-springcloud-example-service</module>
-        <module>discovery-springcloud-example-zuul</module>
-        <module>discovery-springcloud-example-gateway</module>
+        <!-- example -->
+        <module>discovery-springcloud-example</module>
     </modules>
 
     <properties>

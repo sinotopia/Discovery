@@ -1,0 +1,11 @@
+# Nacos config for discovery
+
+spring:
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+        #  namespace: discovery
+        metadata:
+          group: example-admin-group
+          version: 1.0
