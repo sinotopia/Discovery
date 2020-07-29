@@ -40,6 +40,10 @@ public class PluginEventWapper {
         }
     }
 
+    public void fireRuleFailure(RuleFailureEvent ruleFailureEvent) {
+        pluginPublisher.asyncPublish(ruleFailureEvent);
+    }
+
     public void fireVersionUpdated(VersionUpdatedEvent versionUpdatedEvent, boolean async) {
         if (async) {
             pluginPublisher.asyncPublish(versionUpdatedEvent);
@@ -56,13 +60,13 @@ public class PluginEventWapper {
         }
     }
 
-    public void fireParameterChanged(ParameterChangeEvent parameterChangeEvent) {
-        pluginPublisher.asyncPublish(parameterChangeEvent);
+    public void fireParameterChanged(ParameterChangedEvent parameterChangedEvent) {
+        pluginPublisher.asyncPublish(parameterChangedEvent);
     }
 
     public void fireParameterChanged() {
         RuleEntity ruleEntity = pluginAdapter.getRule();
-        fireParameterChanged(new ParameterChangeEvent(ruleEntity != null ? ruleEntity.getParameterEntity() : null));
+        fireParameterChanged(new ParameterChangedEvent(ruleEntity != null ? ruleEntity.getParameterEntity() : null));
     }
 
     public void fireRegisterFailure(RegisterFailureEvent registerFailureEvent) {

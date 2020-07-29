@@ -21,6 +21,7 @@ import com.nepxion.discovery.common.util.JsonUtil;
 import com.nepxion.discovery.common.util.StringUtil;
 import com.nepxion.discovery.plugin.framework.adapter.PluginAdapter;
 import com.nepxion.discovery.plugin.framework.context.PluginContextHolder;
+import com.nepxion.discovery.plugin.strategy.filter.StrategyVersionFilter;
 import com.nepxion.discovery.plugin.strategy.matcher.DiscoveryMatcherStrategy;
 import com.netflix.loadbalancer.Server;
 
@@ -31,6 +32,9 @@ public class DefaultDiscoveryEnabledAdapter implements DiscoveryEnabledAdapter {
     @Autowired
     private DiscoveryMatcherStrategy discoveryMatcherStrategy;
 
+    @Autowired(required = false)
+    private StrategyVersionFilter strategyVersionFilter;
+
     @Autowired
     protected PluginAdapter pluginAdapter;
 
@@ -39,12 +43,12 @@ public class DefaultDiscoveryEnabledAdapter implements DiscoveryEnabledAdapter {
 
     @Override
     public boolean apply(Server server) {
-        boolean enabled = applyVersion(server);
+        boolean enabled = applyRegion(server);
         if (!enabled) {
             return false;
         }
 
-        enabled = applyRegion(server);
+        enabled = applyVersion(server);
         if (!enabled) {
             return false;
         }
@@ -57,65 +61,15 @@ public class DefaultDiscoveryEnabledAdapter implements DiscoveryEnabledAdapter {
         return applyStrategy(server);
     }
 
-    @SuppressWarnings("unchecked")
-    private boolean applyVersion(Server server) {
-        String versionValue = pluginContextHolder.getContextRouteVersion();
-        if (StringUtils.isEmpty(versionValue)) {
-            return true;
-        }
-
+    public boolean applyRegion(Server server) {
         String serviceId = pluginAdapter.getServerServiceId(server);
-        String version = pluginAdapter.getServerVersion(server);
 
-        String versions = null;
-        try {
-            Map<String, String> versionMap = JsonUtil.fromJson(versionValue, Map.class);
-            versions = versionMap.get(serviceId);
-        } catch (Exception e) {
-            versions = versionValue;
-        }
-
-        if (StringUtils.isEmpty(versions)) {
-            return true;
-        }
-
-        // 如果精确匹配不满足，尝试用通配符匹配
-        List<String> versionList = StringUtil.splitToList(versions, DiscoveryConstant.SEPARATE);
-        if (versionList.contains(version)) {
-            return true;
-        }
-
-        // 通配符匹配。前者是通配表达式，后者是具体值
-        for (String versionPattern : versionList) {
-            if (discoveryMatcherStrategy.match(versionPattern, version)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    @SuppressWarnings("unchecked")
-    private boolean applyRegion(Server server) {
-        String regionValue = pluginContextHolder.getContextRouteRegion();
-        if (StringUtils.isEmpty(regionValue)) {
-            return true;
-        }
-
-        String serviceId = pluginAdapter.getServerServiceId(server);
-        String region = pluginAdapter.getServerRegion(server);
-
-        String regions = null;
-        try {
-            Map<String, String> regionMap = JsonUtil.fromJson(regionValue, Map.class);
-            regions = regionMap.get(serviceId);
-        } catch (Exception e) {
-            regions = regionValue;
-        }
-
+        String regions = getRegions(serviceId);
         if (StringUtils.isEmpty(regions)) {
             return true;
         }
+
+        String region = pluginAdapter.getServerRegion(server);
 
         // 如果精确匹配不满足，尝试用通配符匹配
         List<String> regionList = StringUtil.splitToList(regions, DiscoveryConstant.SEPARATE);
@@ -134,16 +88,75 @@ public class DefaultDiscoveryEnabledAdapter implements DiscoveryEnabledAdapter {
     }
 
     @SuppressWarnings("unchecked")
-    private boolean applyAddress(Server server) {
-        String addressValue = pluginContextHolder.getContextRouteAddress();
-        if (StringUtils.isEmpty(addressValue)) {
+    public String getRegions(String serviceId) {
+        String regionValue = pluginContextHolder.getContextRouteRegion();
+        if (StringUtils.isEmpty(regionValue)) {
+            return null;
+        }
+
+        String regions = null;
+        try {
+            Map<String, String> regionMap = JsonUtil.fromJson(regionValue, Map.class);
+            regions = regionMap.get(serviceId);
+        } catch (Exception e) {
+            regions = regionValue;
+        }
+
+        return regions;
+    }
+
+    public boolean applyVersion(Server server) {
+        String serviceId = pluginAdapter.getServerServiceId(server);
+
+        String versions = getVersions(serviceId);
+        if (StringUtils.isEmpty(versions)) {
+            if (strategyVersionFilter != null) {
+                return strategyVersionFilter.apply(server);
+            } else {
+                return true;
+            }
+        }
+
+        String version = pluginAdapter.getServerVersion(server);
+
+        // 如果精确匹配不满足，尝试用通配符匹配
+        List<String> versionList = StringUtil.splitToList(versions, DiscoveryConstant.SEPARATE);
+        if (versionList.contains(version)) {
             return true;
         }
 
+        // 通配符匹配。前者是通配表达式，后者是具体值
+        for (String versionPattern : versionList) {
+            if (discoveryMatcherStrategy.match(versionPattern, version)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    @SuppressWarnings("unchecked")
+    public String getVersions(String serviceId) {
+        String versionValue = pluginContextHolder.getContextRouteVersion();
+        if (StringUtils.isEmpty(versionValue)) {
+            return null;
+        }
+
+        String versions = null;
+        try {
+            Map<String, String> versionMap = JsonUtil.fromJson(versionValue, Map.class);
+            versions = versionMap.get(serviceId);
+        } catch (Exception e) {
+            versions = versionValue;
+        }
+
+        return versions;
+    }
+
+    public boolean applyAddress(Server server) {
         String serviceId = pluginAdapter.getServerServiceId(server);
 
-        Map<String, String> addressMap = JsonUtil.fromJson(addressValue, Map.class);
-        String addresses = addressMap.get(serviceId);
+        String addresses = getAddresses(serviceId);
         if (StringUtils.isEmpty(addresses)) {
             return true;
         }
@@ -164,7 +177,20 @@ public class DefaultDiscoveryEnabledAdapter implements DiscoveryEnabledAdapter {
         return false;
     }
 
-    private boolean applyStrategy(Server server) {
+    @SuppressWarnings("unchecked")
+    public String getAddresses(String serviceId) {
+        String addressValue = pluginContextHolder.getContextRouteAddress();
+        if (StringUtils.isEmpty(addressValue)) {
+            return null;
+        }
+
+        Map<String, String> addressMap = JsonUtil.fromJson(addressValue, Map.class);
+        String addresses = addressMap.get(serviceId);
+
+        return addresses;
+    }
+
+    public boolean applyStrategy(Server server) {
         if (CollectionUtils.isEmpty(discoveryEnabledStrategyList)) {
             return true;
         }

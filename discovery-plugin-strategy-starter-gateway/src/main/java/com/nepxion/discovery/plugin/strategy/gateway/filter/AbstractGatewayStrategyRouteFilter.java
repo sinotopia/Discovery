@@ -11,9 +11,8 @@ package com.nepxion.discovery.plugin.strategy.gateway.filter;
 
 import reactor.core.publisher.Mono;
 
-import java.util.List;
+import java.util.Map;
 
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,12 +21,14 @@ import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.web.server.ServerWebExchange;
 
 import com.nepxion.discovery.common.constant.DiscoveryConstant;
+import com.nepxion.discovery.common.entity.RuleEntity;
+import com.nepxion.discovery.common.entity.StrategyCustomizationEntity;
+import com.nepxion.discovery.common.entity.StrategyHeaderEntity;
 import com.nepxion.discovery.plugin.framework.adapter.PluginAdapter;
-import com.nepxion.discovery.plugin.strategy.constant.StrategyConstant;
 import com.nepxion.discovery.plugin.strategy.context.StrategyContextHolder;
 import com.nepxion.discovery.plugin.strategy.gateway.constant.GatewayStrategyConstant;
 import com.nepxion.discovery.plugin.strategy.gateway.context.GatewayStrategyContext;
-import com.nepxion.discovery.plugin.strategy.gateway.tracer.GatewayStrategyTracer;
+import com.nepxion.discovery.plugin.strategy.gateway.monitor.GatewayStrategyMonitor;
 
 public abstract class AbstractGatewayStrategyRouteFilter implements GatewayStrategyRouteFilter {
     @Autowired
@@ -37,7 +38,7 @@ public abstract class AbstractGatewayStrategyRouteFilter implements GatewayStrat
     protected StrategyContextHolder strategyContextHolder;
 
     @Autowired(required = false)
-    private List<GatewayStrategyTracer> gatewayStrategyTracerList;
+    private GatewayStrategyMonitor gatewayStrategyMonitor;
 
     // 如果外界也传了相同的Header，例如，从Postman传递过来的Header，当下面的变量为true，以网关设置为优先，否则以外界传值为优先
     @Value("${" + GatewayStrategyConstant.SPRING_APPLICATION_STRATEGY_GATEWAY_HEADER_PRIORITY + ":true}")
@@ -50,9 +51,6 @@ public abstract class AbstractGatewayStrategyRouteFilter implements GatewayStrat
     @Value("${" + GatewayStrategyConstant.SPRING_APPLICATION_STRATEGY_GATEWAY_ROUTE_FILTER_ORDER + ":" + GatewayStrategyConstant.SPRING_APPLICATION_STRATEGY_GATEWAY_ROUTE_FILTER_ORDER_VALUE + "}")
     protected Integer filterOrder;
 
-    @Value("${" + StrategyConstant.SPRING_APPLICATION_STRATEGY_TRACE_ENABLED + ":false}")
-    protected Boolean strategyTraceEnabled;
-
     @Override
     public int getOrder() {
         return filterOrder;
@@ -63,14 +61,32 @@ public abstract class AbstractGatewayStrategyRouteFilter implements GatewayStrat
         // 把ServerWebExchange放入ThreadLocal中
         GatewayStrategyContext.getCurrentContext().setExchange(exchange);
 
+        // 通过过滤器设置路由Header头部信息，并全链路传递到服务端
+        ServerHttpRequest.Builder requestBuilder = exchange.getRequest().mutate();
+
+        RuleEntity ruleEntity = pluginAdapter.getRule();
+        if (ruleEntity != null) {
+            StrategyCustomizationEntity strategyCustomizationEntity = ruleEntity.getStrategyCustomizationEntity();
+            if (strategyCustomizationEntity != null) {
+                StrategyHeaderEntity strategyHeaderEntity = strategyCustomizationEntity.getStrategyHeaderEntity();
+                if (strategyHeaderEntity != null) {
+                    Map<String, String> headerMap = strategyHeaderEntity.getHeaderMap();
+                    for (Map.Entry<String, String> entry : headerMap.entrySet()) {
+                        String key = entry.getKey();
+                        String value = entry.getValue();
+
+                        GatewayStrategyFilterResolver.setHeader(requestBuilder, key, value, gatewayHeaderPriority);
+                    }
+                }
+            }
+        }
+
         String routeVersion = getRouteVersion();
         String routeRegion = getRouteRegion();
         String routeAddress = getRouteAddress();
         String routeVersionWeight = getRouteVersionWeight();
         String routeRegionWeight = getRouteRegionWeight();
 
-        // 通过过滤器设置路由Header头部信息，并全链路传递到服务端
-        ServerHttpRequest.Builder requestBuilder = exchange.getRequest().mutate();
         if (StringUtils.isNotEmpty(routeVersion)) {
             GatewayStrategyFilterResolver.setHeader(requestBuilder, DiscoveryConstant.N_D_VERSION, routeVersion, gatewayHeaderPriority);
         } else {
@@ -97,15 +113,21 @@ public abstract class AbstractGatewayStrategyRouteFilter implements GatewayStrat
             GatewayStrategyFilterResolver.ignoreHeader(requestBuilder, DiscoveryConstant.N_D_REGION_WEIGHT, gatewayHeaderPriority, gatewayOriginalHeaderIgnored);
         }
 
+        // 对于服务A -> 网关 -> 服务B调用链
+        // 域网关下(zuulHeaderPriority=true)，只传递网关自身的group，不传递服务A的group，起到基于组的网关端服务调用隔离
+        // 非域网关下(zuulHeaderPriority=false)，优先传递服务A的group，基于组的网关端服务调用隔离不生效，但可以实现基于相关参数的熔断限流等功能        
         GatewayStrategyFilterResolver.setHeader(requestBuilder, DiscoveryConstant.N_D_SERVICE_GROUP, pluginAdapter.getGroup(), gatewayHeaderPriority);
-        if (strategyTraceEnabled) {
-            GatewayStrategyFilterResolver.setHeader(requestBuilder, DiscoveryConstant.N_D_SERVICE_TYPE, pluginAdapter.getServiceType(), gatewayHeaderPriority);
-            GatewayStrategyFilterResolver.setHeader(requestBuilder, DiscoveryConstant.N_D_SERVICE_ID, pluginAdapter.getServiceId(), gatewayHeaderPriority);
-            GatewayStrategyFilterResolver.setHeader(requestBuilder, DiscoveryConstant.N_D_SERVICE_ADDRESS, pluginAdapter.getHost() + ":" + pluginAdapter.getPort(), gatewayHeaderPriority);
-            GatewayStrategyFilterResolver.setHeader(requestBuilder, DiscoveryConstant.N_D_SERVICE_VERSION, pluginAdapter.getVersion(), gatewayHeaderPriority);
-            GatewayStrategyFilterResolver.setHeader(requestBuilder, DiscoveryConstant.N_D_SERVICE_REGION, pluginAdapter.getRegion(), gatewayHeaderPriority);
-            GatewayStrategyFilterResolver.setHeader(requestBuilder, DiscoveryConstant.N_D_SERVICE_ENVIRONMENT, pluginAdapter.getEnvironment(), gatewayHeaderPriority);
+        // 网关只负责传递服务A的相关参数（例如：serviceId），不传递自身的参数，实现基于相关参数的熔断限流等功能
+        GatewayStrategyFilterResolver.setHeader(requestBuilder, DiscoveryConstant.N_D_SERVICE_TYPE, pluginAdapter.getServiceType(), false);
+        String serviceAppId = pluginAdapter.getServiceAppId();
+        if (StringUtils.isNotEmpty(serviceAppId)) {
+            GatewayStrategyFilterResolver.setHeader(requestBuilder, DiscoveryConstant.N_D_SERVICE_APP_ID, serviceAppId, false);
         }
+        GatewayStrategyFilterResolver.setHeader(requestBuilder, DiscoveryConstant.N_D_SERVICE_ID, pluginAdapter.getServiceId(), false);
+        GatewayStrategyFilterResolver.setHeader(requestBuilder, DiscoveryConstant.N_D_SERVICE_ADDRESS, pluginAdapter.getHost() + ":" + pluginAdapter.getPort(), false);
+        GatewayStrategyFilterResolver.setHeader(requestBuilder, DiscoveryConstant.N_D_SERVICE_VERSION, pluginAdapter.getVersion(), false);
+        GatewayStrategyFilterResolver.setHeader(requestBuilder, DiscoveryConstant.N_D_SERVICE_REGION, pluginAdapter.getRegion(), false);
+        GatewayStrategyFilterResolver.setHeader(requestBuilder, DiscoveryConstant.N_D_SERVICE_ENVIRONMENT, pluginAdapter.getEnvironment(), false);
 
         ServerHttpRequest newRequest = requestBuilder.build();
         ServerWebExchange newExchange = exchange.mutate().request(newRequest).build();
@@ -117,11 +139,15 @@ public abstract class AbstractGatewayStrategyRouteFilter implements GatewayStrat
         // 把新的ServerWebExchange放入ThreadLocal中
         GatewayStrategyContext.getCurrentContext().setExchange(newExchange);
 
-        // 调用链追踪
-        if (CollectionUtils.isNotEmpty(gatewayStrategyTracerList)) {
-            for (GatewayStrategyTracer gatewayStrategyTracer : gatewayStrategyTracerList) {
-                gatewayStrategyTracer.trace(finalExchange);
-            }
+        // 调用链监控
+        if (gatewayStrategyMonitor != null) {
+            gatewayStrategyMonitor.monitor(finalExchange);
+        }
+
+        // 拦截侦测请求
+        String path = finalExchange.getRequest().getPath().toString();
+        if (path.contains(DiscoveryConstant.INSPECTOR_ENDPOINT_URL)) {
+            GatewayStrategyFilterResolver.setHeader(requestBuilder, DiscoveryConstant.INSPECTOR_ENDPOINT_HEADER, pluginAdapter.getPluginInfo(null), true);
         }
 
         return chain.filter(finalExchange);

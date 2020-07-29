@@ -11,20 +11,17 @@ package com.nepxion.discovery.plugin.strategy.gateway.filter;
 
 import reactor.core.publisher.Mono;
 
-import java.util.List;
-
-import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.core.Ordered;
 import org.springframework.web.server.ServerWebExchange;
 
 import com.nepxion.discovery.plugin.strategy.gateway.context.GatewayStrategyContext;
-import com.nepxion.discovery.plugin.strategy.gateway.tracer.GatewayStrategyTracer;
+import com.nepxion.discovery.plugin.strategy.gateway.monitor.GatewayStrategyMonitor;
 
 public class DefaultGatewayStrategyClearFilter implements GatewayStrategyClearFilter {
     @Autowired(required = false)
-    private List<GatewayStrategyTracer> gatewayStrategyTracerList;
+    private GatewayStrategyMonitor gatewayStrategyMonitor;
 
     @Override
     public int getOrder() {
@@ -36,10 +33,8 @@ public class DefaultGatewayStrategyClearFilter implements GatewayStrategyClearFi
         GatewayStrategyContext.clearCurrentContext();
 
         // 调用链释放
-        if (CollectionUtils.isNotEmpty(gatewayStrategyTracerList)) {
-            for (GatewayStrategyTracer gatewayStrategyTracer : gatewayStrategyTracerList) {
-                gatewayStrategyTracer.release(exchange);
-            }
+        if (gatewayStrategyMonitor != null) {
+            gatewayStrategyMonitor.release(exchange);
         }
 
         return chain.filter(exchange);

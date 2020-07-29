@@ -18,7 +18,9 @@ import com.nepxion.banner.LogoBanner;
 import com.nepxion.banner.NepxionBanner;
 import com.nepxion.discovery.common.apollo.constant.ApolloConstant;
 import com.nepxion.discovery.plugin.configcenter.adapter.ConfigAdapter;
+import com.nepxion.discovery.plugin.configcenter.apollo.adapter.ApolloApplicationInfoAdapter;
 import com.nepxion.discovery.plugin.configcenter.apollo.adapter.ApolloConfigAdapter;
+import com.nepxion.discovery.plugin.framework.adapter.ApplicationInfoAdapter;
 import com.taobao.text.Color;
 
 @Configuration
@@ -47,5 +49,10 @@ public class ApolloConfigAutoConfiguration {
     @Bean
     public ConfigAdapter configAdapter() {
         return new ApolloConfigAdapter();
+    }
+
+    @Bean
+    public ApplicationInfoAdapter applicationInfoAdapter() {
+        return new ApolloApplicationInfoAdapter();
     }
 }

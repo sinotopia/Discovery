@@ -16,15 +16,21 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.expression.TypeComparator;
 
+import com.nepxion.discovery.plugin.strategy.adapter.DefaultStrategyVersionFilterAdapter;
+import com.nepxion.discovery.plugin.strategy.adapter.StrategyVersionFilterAdapter;
 import com.nepxion.discovery.plugin.strategy.condition.DefaultStrategyTypeComparor;
 import com.nepxion.discovery.plugin.strategy.condition.HeaderExpressionStrategyCondition;
 import com.nepxion.discovery.plugin.strategy.condition.StrategyCondition;
 import com.nepxion.discovery.plugin.strategy.constant.StrategyConstant;
+import com.nepxion.discovery.plugin.strategy.filter.StrategyVersionFilter;
 import com.nepxion.discovery.plugin.strategy.isolation.ConsumerIsolationDiscoveryStrategy;
 import com.nepxion.discovery.plugin.strategy.isolation.ConsumerIsolationLoadBalanceStrategy;
 import com.nepxion.discovery.plugin.strategy.isolation.ConsumerIsolationRegisterStrategy;
 import com.nepxion.discovery.plugin.strategy.matcher.DiscoveryAntPathMatcherStrategy;
 import com.nepxion.discovery.plugin.strategy.matcher.DiscoveryMatcherStrategy;
+import com.nepxion.discovery.plugin.strategy.monitor.DefaultStrategyLogger;
+import com.nepxion.discovery.plugin.strategy.monitor.StrategyLogger;
+import com.nepxion.discovery.plugin.strategy.monitor.StrategyMonitorContext;
 import com.nepxion.discovery.plugin.strategy.wrapper.StrategyWrapper;
 
 @Configuration
@@ -56,6 +62,34 @@ public class StrategyAutoConfiguration {
     @ConditionalOnProperty(value = StrategyConstant.SPRING_APPLICATION_STRATEGY_CONSUMER_ISOLATION_ENABLED, matchIfMissing = false)
     public ConsumerIsolationLoadBalanceStrategy consumerIsolationLoadBalanceStrategy() {
         return new ConsumerIsolationLoadBalanceStrategy();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(value = StrategyConstant.SPRING_APPLICATION_STRATEGY_VERSION_FILTER_ENABLED, matchIfMissing = false)
+    public StrategyVersionFilter strategyVersionFilter() {
+        return new StrategyVersionFilter();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(value = StrategyConstant.SPRING_APPLICATION_STRATEGY_VERSION_FILTER_ENABLED, matchIfMissing = false)
+    public StrategyVersionFilterAdapter strategyVersionFilterAdapter() {
+        return new DefaultStrategyVersionFilterAdapter();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(value = StrategyConstant.SPRING_APPLICATION_STRATEGY_MONITOR_ENABLED, matchIfMissing = false)
+    public StrategyMonitorContext strategyMonitorContext() {
+        return new StrategyMonitorContext();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(value = StrategyConstant.SPRING_APPLICATION_STRATEGY_MONITOR_ENABLED, matchIfMissing = false)
+    public StrategyLogger strategyLogger() {
+        return new DefaultStrategyLogger();
     }
 
     @Bean

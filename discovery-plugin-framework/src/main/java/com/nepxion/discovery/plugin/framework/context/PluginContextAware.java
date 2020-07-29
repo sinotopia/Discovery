@@ -24,10 +24,16 @@ public class PluginContextAware implements ApplicationContextAware {
     private ApplicationContext applicationContext;
     private Environment environment;
 
+    private static ApplicationContext staticApplicationContext;
+    private static Environment staticEnvironment;
+
     @Override
     public void setApplicationContext(ApplicationContext applicationContext) {
         this.applicationContext = applicationContext;
         this.environment = applicationContext.getEnvironment();
+
+        staticApplicationContext = applicationContext;
+        staticEnvironment = applicationContext.getEnvironment();
     }
 
     public Object getBean(String name) throws BeansException {
@@ -84,6 +90,14 @@ public class PluginContextAware implements ApplicationContextAware {
 
     public Environment getEnvironment() {
         return environment;
+    }
+
+    public static ApplicationContext getStaticApplicationContext() {
+        return staticApplicationContext;
+    }
+
+    public static Environment getStaticEnvironment() {
+        return staticEnvironment;
     }
 
     public Boolean isRegisterControlEnabled() {
@@ -207,7 +221,7 @@ public class PluginContextAware implements ApplicationContextAware {
     }
 
     public static String getGitVersionKey(Environment environment) {
-        return environment.getProperty(DiscoveryConstant.SPRING_APPLICATION_GIT_VERSION_KEY, String.class, "{" + DiscoveryConstant.GIT_COMMIT_ID_ABBREV + "}-{" + DiscoveryConstant.GIT_COMMIT_TIME + "}");
+        return environment.getProperty(DiscoveryConstant.SPRING_APPLICATION_GIT_VERSION_KEY, String.class, "{" + DiscoveryConstant.GIT_COMMIT_TIME + "}-{" + DiscoveryConstant.GIT_TOTAL_COMMIT_COUNT + "}");
     }
 
     public static String getContextPath(Environment environment) {

@@ -9,6 +9,7 @@ package com.nepxion.discovery.plugin.framework.adapter;
  * @version 1.0
  */
 
+import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
@@ -22,6 +23,7 @@ import com.nepxion.discovery.common.entity.RuleEntity;
 import com.nepxion.discovery.common.exception.DiscoveryException;
 import com.nepxion.discovery.plugin.framework.cache.PluginCache;
 import com.nepxion.discovery.plugin.framework.cache.RuleCache;
+import com.nepxion.discovery.plugin.framework.context.PluginContextHolder;
 import com.netflix.loadbalancer.Server;
 
 public abstract class AbstractPluginAdapter implements PluginAdapter {
@@ -31,14 +33,27 @@ public abstract class AbstractPluginAdapter implements PluginAdapter {
     @Autowired
     protected PluginCache pluginCache;
 
+    @Autowired(required = false)
+    protected PluginContextHolder pluginContextHolder;
+
     @Autowired
     protected RuleCache ruleCache;
+
+    @Autowired(required = false)
+    protected ApplicationInfoAdapter applicationInfoAdapter;
 
     @Value("${" + DiscoveryConstant.SPRING_APPLICATION_GROUP_KEY + ":" + DiscoveryConstant.GROUP + "}")
     private String groupKey;
 
     @Value("${" + DiscoveryConstant.SPRING_APPLICATION_TYPE + ":" + DiscoveryConstant.UNKNOWN + "}")
     private String applicationType;
+
+    protected Map<String, String> emptyMetadata = new HashMap<String, String>();
+
+    @Override
+    public String getPlugin() {
+        return getMetadata().get(DiscoveryConstant.SPRING_APPLICATION_DISCOVERY_PLUGIN);
+    }
 
     @Override
     public String getGroupKey() {
@@ -69,6 +84,15 @@ public abstract class AbstractPluginAdapter implements PluginAdapter {
     @Override
     public String getServiceId() {
         return registration.getServiceId().toLowerCase();
+    }
+
+    @Override
+    public String getServiceAppId() {
+        if (applicationInfoAdapter != null) {
+            return applicationInfoAdapter.getAppId();
+        }
+
+        return null;
     }
 
     @Override
@@ -182,6 +206,11 @@ public abstract class AbstractPluginAdapter implements PluginAdapter {
     }
 
     @Override
+    public String getServerPlugin(Server server) {
+        return getServerMetadata(server).get(DiscoveryConstant.SPRING_APPLICATION_DISCOVERY_PLUGIN);
+    }
+
+    @Override
     public String getServerGroupKey(Server server) {
         String groupKey = getServerMetadata(server).get(DiscoveryConstant.SPRING_APPLICATION_GROUP_KEY);
 
@@ -264,6 +293,11 @@ public abstract class AbstractPluginAdapter implements PluginAdapter {
     }
 
     @Override
+    public String getInstancePlugin(ServiceInstance serviceInstance) {
+        return getInstanceMetadata(serviceInstance).get(DiscoveryConstant.SPRING_APPLICATION_DISCOVERY_PLUGIN);
+    }
+
+    @Override
     public String getInstanceGroupKey(ServiceInstance serviceInstance) {
         String groupKey = getInstanceMetadata(serviceInstance).get(DiscoveryConstant.SPRING_APPLICATION_GROUP_KEY);
 
@@ -333,6 +367,7 @@ public abstract class AbstractPluginAdapter implements PluginAdapter {
 
     @Override
     public String getPluginInfo(String previousPluginInfo) {
+        String plugin = getPlugin();
         String serviceId = getServiceId();
         String host = getHost();
         int port = getPort();
@@ -342,8 +377,13 @@ public abstract class AbstractPluginAdapter implements PluginAdapter {
         String group = getGroup();
 
         StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append(previousPluginInfo + " -> " + serviceId);
-        stringBuilder.append("[" + host + ":" + port + "]");
+        if (StringUtils.isNotEmpty(previousPluginInfo)) {
+            stringBuilder.append(previousPluginInfo + " -> ");
+        }
+
+        stringBuilder.append("[ID=" + serviceId + "]");
+        stringBuilder.append("[P=" + plugin + "]");
+        stringBuilder.append("[H=" + host + ":" + port + "]");
         if (StringUtils.isNotEmpty(version)) {
             stringBuilder.append("[V=" + version + "]");
         }
@@ -355,6 +395,18 @@ public abstract class AbstractPluginAdapter implements PluginAdapter {
         }
         if (StringUtils.isNotEmpty(group)) {
             stringBuilder.append("[G=" + group + "]");
+        }
+
+        if (pluginContextHolder != null) {
+            String traceId = pluginContextHolder.getTraceId();
+            if (StringUtils.isNotEmpty(traceId)) {
+                stringBuilder.append("[TID=" + traceId + "]");
+            }
+
+            String spanId = pluginContextHolder.getSpanId();
+            if (StringUtils.isNotEmpty(spanId)) {
+                stringBuilder.append("[SID=" + spanId + "]");
+            }
         }
 
         return stringBuilder.toString();
